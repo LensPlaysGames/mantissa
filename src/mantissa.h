@@ -79,6 +79,11 @@ struct FloatImpl {
         set_mantissa(mantissa);
     }
 
+    constexpr void set_zero(bool isNegative = false) {
+        representation = 0;
+        set_negative(isNegative);
+    }
+
     /// Will update both exponent and mantissa to ensure that there
     /// *is* an implicit leading one, if needed.
     constexpr void set_mantissa_normalised(Repr new_mantissa) {
@@ -167,7 +172,7 @@ struct FloatImpl {
         SignedRepr right_mantissa = get_right_mantissa();
         SignedRepr new_mantissa = left_mantissa + right_mantissa;
         if (new_mantissa == 0) {
-            set(false, 0, 0);
+            set_zero();
             return;
         }
         if (new_mantissa < 0) {
@@ -216,7 +221,7 @@ struct FloatImpl {
         SignedRepr right_mantissa = get_right_mantissa();
         SignedRepr new_mantissa = left_mantissa - right_mantissa;
         if ((new_mantissa & mantissa_mask) == 0) {
-            set(false, 0, 0);
+            set_zero();
             return;
         }
         bool isNegative = false;
