@@ -79,6 +79,30 @@ struct FloatImpl {
         set_mantissa(mantissa);
     }
 
+    /// Will update both exponent and mantissa to ensure that there
+    /// *is* an implicit leading one, if needed.
+    constexpr void set_mantissa_normalised(Repr new_mantissa) {
+        SignedRepr new_exponent = exponent();
+        // If there are bits set above the implicit one in the given
+        // mantissa, shift it to the right until the highest bit is the
+        // implicit leading one that won't end up being stored.
+        while (((new_mantissa & ~mantissa_mask) >> exponent_bit) > 1) {
+            ++new_exponent;
+            new_mantissa >>= 1;
+        }
+        // If the new mantissa is non-zero and...
+        if (new_mantissa) {
+            // If the implicit leading one *isn't* set, shift it to the
+            // left until the leading one is set.
+            while (!(new_mantissa & ~mantissa_mask)) {
+                --new_exponent;
+                new_mantissa <<= 1;
+            }
+        }
+        set_exponent(new_exponent);
+        set_mantissa(new_mantissa);
+    }
+
     std::string mantissa_string(Repr base = 10) const {
         Repr mtsa = mantissa_no_leading();
         std::string out;
