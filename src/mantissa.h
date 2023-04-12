@@ -33,7 +33,7 @@ struct FloatImpl {
         return std::bit_cast<float>(representation);
     }
 #else
-    FloatImpl(float f) : representation(*reinterpret_cast<Repr*>(&f)) {}
+    constexpr FloatImpl(float f) : representation(*reinterpret_cast<Repr*>(&f)) {}
     constexpr operator float() {
         return *reinterpret_cast<float*>(&representation);
     }
@@ -53,6 +53,11 @@ struct FloatImpl {
 
     constexpr SignedRepr exponent() const {
         return ((representation & exponent_mask) >> exponent_bit) - exponent_bias;
+    }
+
+    /// Return true iff the exponent has every single one bit set.
+    constexpr bool exponent_ones() const {
+        return (representation & exponent_mask) == exponent_mask;
     }
 
     constexpr void set_exponent(SignedRepr exponent) {
@@ -108,6 +113,13 @@ struct FloatImpl {
         set_mantissa(new_mantissa);
     }
 
+    constexpr bool is_infinity() const {
+        return exponent_ones() && !mantissa();
+    }
+    constexpr bool is_nan() const {
+        return exponent_ones() && mantissa();
+    }
+
     std::string mantissa_string(Repr base = 10) const {
         Repr mtsa = mantissa_no_leading();
         std::string out;
@@ -124,8 +136,22 @@ struct FloatImpl {
     std::string ascii_scientific() const {
         std::string out;
         if (negative()) out += '-';
-        if (!exponent() && !mantissa()) {
-            out += '0';
+        if (!exponent()) {
+            if (!mantissa()) {
+                out += '0';
+                return out;
+            }
+            // TODO: handle subnormal numbers (0.mantissa * 2^-126)
+            out += "handle subnormal numbers";
+            return out;
+        }
+        // Every bit set in the exponent means infinity or NaN.
+        else if (exponent_ones()) {
+            if (!mantissa()) {
+                out += "inf";
+                return out;
+            }
+            out += "NaN";
             return out;
         }
         out += "1.";
@@ -183,7 +209,7 @@ struct FloatImpl {
         set_mantissa_normalised(new_mantissa);
     }
 
-    constexpr FloatImpl operator+(FloatImpl rhs) {
+    constexpr FloatImpl operator+(FloatImpl rhs) const {
         rhs.add(*this);
         return rhs;
     }
@@ -233,7 +259,7 @@ struct FloatImpl {
         set_mantissa_normalised(new_mantissa);
     }
 
-    constexpr FloatImpl operator-(FloatImpl rhs) {
+    constexpr FloatImpl operator-(FloatImpl rhs) const {
         FloatImpl lhs = *this;
         lhs.sub(rhs);
         return lhs;
