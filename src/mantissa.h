@@ -95,7 +95,7 @@ struct FloatImpl {
     std::string ascii_scientific() const {
         std::string out;
         if (negative()) out += '-';
-        if ((representation & ~sign_mask) == 0) {
+        if (!exponent() && !mantissa()) {
             out += '0';
             return out;
         }
