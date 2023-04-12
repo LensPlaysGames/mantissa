@@ -131,6 +131,14 @@ struct FloatImpl {
     }
 
     constexpr void add(FloatImpl rhs) {
+        // a + -b  =  a - b
+        if (rhs.negative()) {
+            sub({false, rhs.exponent(), rhs.mantissa()});
+            return;
+        }
+
+        // From this point on, RHS is *not* negative.
+
         bool lhs_leading = true;
         auto get_left_mantissa = [&]() {
             if (lhs_leading) return mantissa();
@@ -173,6 +181,57 @@ struct FloatImpl {
     constexpr FloatImpl operator+(FloatImpl rhs) {
         rhs.add(*this);
         return rhs;
+    }
+
+    constexpr void sub(FloatImpl rhs) {
+        // a - -b  =  a + b
+        if (rhs.negative())
+            return add({false, rhs.exponent(), rhs.mantissa()});
+
+        // From this point on, RHS is *not* negative.
+
+        bool lhs_leading = true;
+        auto get_left_mantissa = [&]() {
+            if (lhs_leading) return mantissa();
+            else return mantissa_no_leading();
+        };
+        bool rhs_leading = true;
+        auto get_right_mantissa = [&]() {
+            if (rhs_leading) return rhs.mantissa();
+            else return rhs.mantissa_no_leading();
+        };
+        while (exponent() < rhs.exponent()) {;
+            set_exponent(exponent() + 1);
+            set_mantissa(get_left_mantissa() >> 1);
+            lhs_leading = false;
+        }
+        while (rhs.exponent() < exponent()) {
+            rhs.set_exponent(rhs.exponent() + 1);
+            rhs.set_mantissa(get_right_mantissa() >> 1);
+            rhs_leading = false;
+        }
+
+        SignedRepr left_mantissa = get_left_mantissa();
+        if (negative()) left_mantissa *= -1;
+        SignedRepr right_mantissa = get_right_mantissa();
+        SignedRepr new_mantissa = left_mantissa - right_mantissa;
+        if ((new_mantissa & mantissa_mask) == 0) {
+            set(false, 0, 0);
+            return;
+        }
+        bool isNegative = false;
+        if (new_mantissa < 0) {
+            isNegative = true;
+            new_mantissa *= -1;
+        }
+        set_negative(isNegative);
+        set_mantissa_normalised(new_mantissa);
+    }
+
+    constexpr FloatImpl operator-(FloatImpl rhs) {
+        FloatImpl lhs = *this;
+        lhs.sub(rhs);
+        return lhs;
     }
 };
 
