@@ -130,7 +130,7 @@ struct FloatImpl {
         return out;
     }
 
-    void add(FloatImpl rhs) {
+    constexpr void add(FloatImpl rhs) {
         bool lhs_leading = true;
         auto get_left_mantissa = [&]() {
             if (lhs_leading) return mantissa();
@@ -153,30 +153,24 @@ struct FloatImpl {
         }
 
         bool isNegative = false;
-        SignedRepr new_exponent = exponent();
 
         SignedRepr left_mantissa = get_left_mantissa();
         if (negative()) left_mantissa *= -1;
-
         SignedRepr right_mantissa = get_right_mantissa();
-        if (rhs.negative()) right_mantissa *= -1;
-
-        SignedRepr tmp_mantissa = left_mantissa + right_mantissa;
-        if (tmp_mantissa == 0) set(false, 0, 0);
-        if (tmp_mantissa < 0) {
+        SignedRepr new_mantissa = left_mantissa + right_mantissa;
+        if (new_mantissa == 0) {
+            set(false, 0, 0);
+            return;
+        }
+        if (new_mantissa < 0) {
             isNegative = true;
-            tmp_mantissa *= -1;
+            new_mantissa *= -1;
         }
-        Repr new_mantissa = tmp_mantissa;
-        while (((new_mantissa & ~mantissa_mask) >> exponent_bit) > 1) {
-            ++new_exponent;
-            new_mantissa >>= 1;
-        }
-
-        set(isNegative, new_exponent, new_mantissa);
+        set_negative(isNegative);
+        set_mantissa_normalised(new_mantissa);
     }
 
-    FloatImpl operator+(FloatImpl rhs) {
+    constexpr FloatImpl operator+(FloatImpl rhs) {
         rhs.add(*this);
         return rhs;
     }
