@@ -84,9 +84,8 @@ struct FloatImpl {
         std::string out;
         if (mtsa)
             while (mtsa) {
-                // .011b -> .375d
                 mtsa *= base;
-                out += '0' + ((mtsa & exponent_mask) >> exponent_bit);
+                out += '0' + ((mtsa & ~mantissa_mask) >> exponent_bit);
                 mtsa &= mantissa_mask;
             }
         else return "0";
