@@ -55,7 +55,12 @@ struct FloatImpl {
         return ((representation & exponent_mask) >> exponent_bit) - exponent_bias;
     }
 
-    /// Return true iff the exponent has every single one bit set.
+    /// Return true iff the exponent has every single bit cleared.
+    constexpr bool exponent_zeroes() const {
+        return (representation & exponent_mask) == 0;
+    }
+
+    /// Return true iff the exponent has every single bit set.
     constexpr bool exponent_ones() const {
         return (representation & exponent_mask) == exponent_mask;
     }
@@ -116,8 +121,11 @@ struct FloatImpl {
     constexpr bool is_infinity() const {
         return exponent_ones() && !mantissa();
     }
-    constexpr bool is_nan() const {
+    constexpr bool is_not_a_number() const {
         return exponent_ones() && mantissa();
+    }
+    constexpr bool is_zero() const {
+        return exponent_zeroes() && !mantissa();
     }
 
     std::string mantissa_string(Repr base = 10) const {
@@ -136,21 +144,26 @@ struct FloatImpl {
     std::string ascii_scientific() const {
         std::string out;
         if (negative()) out += '-';
-        if (!exponent()) {
+        if (exponent_zeroes()) {
+            // Zero
             if (!mantissa()) {
                 out += '0';
                 return out;
             }
-            // TODO: handle subnormal numbers (0.mantissa * 2^-126)
-            out += "handle subnormal numbers";
+            // Subnormal
+            out += "0.";
+            out += mantissa_string();
+            out += "x2^-126";
             return out;
         }
         // Every bit set in the exponent means infinity or NaN.
         else if (exponent_ones()) {
+            // Infinity
             if (!mantissa()) {
                 out += "inf";
                 return out;
             }
+            // Not a Number (NaN)
             out += "NaN";
             return out;
         }
