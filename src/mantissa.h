@@ -94,6 +94,18 @@ struct FloatImpl {
         set_negative(isNegative);
     }
 
+    /// Set the float representation to signify a quiet NaN, either
+    /// positive or negative.
+    constexpr void set_not_a_number(bool isNegative = false) {
+        // Set all bits in the exponent.
+        representation = exponent_mask;
+        // Make mantissa a non-zero value to indicate NaN vs infinity.
+        representation |= mantissa_mask;
+        // Clear top bit of mantissa as this is not a signalling NaN.
+        representation &= ~(1 << (exponent_bit - 1));
+        set_negative(isNegative);
+    }
+
     /// Will update both exponent and mantissa to ensure that there
     /// *is* an implicit leading one, if needed.
     constexpr void set_mantissa_normalised(Repr new_mantissa) {
@@ -175,6 +187,19 @@ struct FloatImpl {
     }
 
     constexpr void add(FloatImpl rhs) {
+        /// X + 0 is still X.
+        if (rhs.is_zero()) return;
+        /// NaN + anything is still NaN.
+        if (is_not_a_number()) return;
+        /// infinity + anything is still infinity.
+        if (is_infinity()) return;
+        /// Anything + NaN is still NaN.
+        /// Anything + infinity is still infinity.
+        if (rhs.is_not_a_number() || rhs.is_infinity()) {
+            *this = rhs;
+            return;
+        }
+
         // a + -b  =  a - b
         if (rhs.negative()) {
             sub({false, rhs.exponent(), rhs.mantissa()});
@@ -228,6 +253,19 @@ struct FloatImpl {
     }
 
     constexpr void sub(FloatImpl rhs) {
+        /// X - 0 is still X.
+        if (rhs.is_zero()) return;
+        /// NaN - anything is still NaN.
+        if (is_not_a_number()) return;
+        /// infinity - anything is still infinity.
+        if (is_infinity()) return;
+        /// Anything - NaN is still NaN.
+        /// Anything - infinity is still infinity.
+        if (rhs.is_not_a_number() || rhs.is_infinity()) {
+            *this = rhs;
+            return;
+        }
+
         // a - -b  =  a + b
         if (rhs.negative())
             return add({false, rhs.exponent(), rhs.mantissa()});
