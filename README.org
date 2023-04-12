@@ -1,0 +1,25 @@
+* Mantissa Library: Floating Point in Software
+
+Mostly, this was implemented for fun, and to learn more about the black magic behind floating point numbers in C and C++.
+
+** Building
+
+Dependencies:
+- [[https://cmake.org/download/][CMake]]
+- A C++ compiler (any will do)
+
+First, generate a build tree using CMake.
+#+begin_src sh
+  cmake -B bld
+#+end_src
+
+Then, invoke the build tree to build the library, tests, and everything else involved with =mantissa=.
+#+begin_src sh
+  cmake --build bld
+#+end_src
+
+** Using
+
+If your project uses CMake, using this library shouldn't be too difficult at all.
+
+First, copy this source tree somewhere locally. Then, in your project's ~CMakeLists.txt~, add a call to ~add_subdirectory~ with a path that points to where you keep the local source tree of =mantissa=. After this, simply use ~target_link_libraries(<your_target> PRIVATE mantissa)~ and ~#include <mantissa.h>~ in your source code where you'd like to use it.
