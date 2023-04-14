@@ -318,6 +318,18 @@ struct FloatImpl {
     }
 
     void mul(FloatImpl rhs) {
+        /// Zero * anything is still zero.
+        /// NaN * anything is still NaN.
+        /// Infinity * anything is still infinity.
+        if (is_zero() || is_not_a_number() || is_infinity()) return;
+        /// Anything * zero is still zero.
+        /// Anything * NaN is still NaN.
+        /// Anything * infinity is still infinity.
+        if (rhs.is_zero() || rhs.is_not_a_number() || rhs.is_infinity()) {
+            *this = rhs;
+            return;
+        }
+
         // LaTeX:
         // s_A.m_A.2^{{e}_A} \times s_A.m_A.2^{{e}_A} = (s_A \oplus s_B).m_A \times m_B.2^{(e_A + e_B) + n_{bias}}
 
@@ -343,7 +355,7 @@ struct FloatImpl {
         static constexpr Repr shift_amount = (1 + exponent_bit) / 2 + ((1 + exponent_bit) % 2);
         static constexpr Repr shift_mask = (Repr(1) << shift_amount) - 1;
         // Calculate product of lower half of mantissa.
-        Repr low_mantissa = (left_mantissa & shift_mask) * (right_mantissa & shift_mask);
+        //Repr low_mantissa = (left_mantissa & shift_mask) * (right_mantissa & shift_mask);
         // Calculate product of higher half of mantissa.
         Repr high_mantissa = (left_mantissa >> shift_amount) * (right_mantissa >> shift_amount);
         // All of the top mantissa bits are set from the low bits of the high mantissa;
