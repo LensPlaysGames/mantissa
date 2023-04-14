@@ -2,6 +2,7 @@
 #define MANTISSA_MAIN_H
 
 #include <bit>
+#include <bitset>
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -315,6 +316,55 @@ struct FloatImpl {
         lhs.sub(rhs);
         return lhs;
     }
+
+    void mul(FloatImpl rhs) {
+        // LaTeX:
+        // s_A.m_A.2^{{e}_A} \times s_A.m_A.2^{{e}_A} = (s_A \oplus s_B).m_A \times m_B.2^{(e_A + e_B) + n_{bias}}
+
+        Repr left_mantissa = mantissa();
+        Repr right_mantissa = rhs.mantissa();
+
+        // The sign of the product is equal to the exclusive logical disjunction of both operand's signs.
+        set_negative(negative() ^ rhs.negative());
+
+        // The exponent of the product is equal to the sum of both operand's exponents.
+        set_exponent(exponent() + rhs.exponent());
+
+        // The mantissa of the product is equal to the multiplication of both operand's mantissas.
+
+        // When multiplying, the product requires twice as much storage as the
+        // operands; for a 24-bit mantissa, this would require 48 bits for the
+        // product. Because things can get kind of weird here with bit numbers,
+        // we just use two of the underlying representation for each half of
+        // the bits. This is a software version of a very dumbed-down
+        // Karatsuba-Urdhva multiplier, afaik.
+
+        // Amount of mantissa bits over two (half)
+        static constexpr Repr shift_amount = (1 + exponent_bit) / 2 + ((1 + exponent_bit) % 2);
+        static constexpr Repr shift_mask = (Repr(1) << shift_amount) - 1;
+        // Calculate product of lower half of mantissa.
+        Repr low_mantissa = (left_mantissa & shift_mask) * (right_mantissa & shift_mask);
+        // Calculate product of higher half of mantissa.
+        Repr high_mantissa = (left_mantissa >> shift_amount) * (right_mantissa >> shift_amount);
+        // All of the top mantissa bits are set from the low bits of the high mantissa;
+        // the bottom bit would be set by the MSB of the low mantissa,
+        // but we are doing ties-to-even rounding which means the
+        // bottom bit of the mantissa will never be set, afaik.
+        Repr new_mantissa = (high_mantissa << 1);
+        set_mantissa_normalised(new_mantissa);
+    }
+
+    constexpr FloatImpl operator*(FloatImpl rhs) const {
+        FloatImpl lhs = *this;
+        lhs.mul(rhs);
+        return lhs;
+    }
+
+    //constexpr FloatImpl operator/(FloatImpl rhs) const {
+    //    FloatImpl lhs = *this;
+    //    lhs.div(rhs);
+    //    return lhs;
+    //}
 };
 
 using binary32 = FloatImpl<u32,
