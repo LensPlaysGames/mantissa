@@ -5,12 +5,14 @@
 #include <bit>
 
 int main() {
-    binary32 number0{-4.20f};
-    binary32 number1{-10.0f};
+    float lhs = -4.20f;
+    float rhs = -10.0f;
+    binary32 number0{lhs};
+    binary32 number1{rhs};
     binary32 product = number0 * number1;
     float fproduct = product;
-    float expected = -4.20f * -10.0f;
+    float expected = lhs * rhs;
     (std::cout << std::bitset<32>(product.representation)) << '\n';
     (std::cout << std::bitset<32>(*reinterpret_cast<uint32_t*>(&expected))) << '\n';
-    MANTISSA_VALIDATE(fproduct == (-4.20f * -10.0f));
+    MANTISSA_VALIDATE(fproduct == (lhs * rhs));
 }
