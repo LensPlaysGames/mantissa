@@ -92,9 +92,8 @@ int main() {
         std::cout << "diff: " << fdiff << '\n';
     }
     */
-    /*
     {
-        binary32 foo{42.0f};
+        binary32 foo{4.20f};
         binary32 bar{10.0f};
         std::cout << foo.ascii_scientific() << '\n';
         std::cout << bar.ascii_scientific() << '\n';
@@ -103,10 +102,13 @@ int main() {
 
         float fproduct = product;
         std::cout << "product: " << fproduct << '\n';
+
+        float testproduct = 4.20f * 10.0f;
+        std::cout << "actual floats: " << testproduct << '\n';
     }
     {
-        binary32 foo{-42.0f};
-        binary32 bar{10.0f};
+        binary32 foo{-18.0f};
+        binary32 bar{9.5f};
         std::cout << foo.ascii_scientific() << '\n';
         std::cout << bar.ascii_scientific() << '\n';
         binary32 product = foo * bar;
@@ -137,6 +139,5 @@ int main() {
         float fproduct = product;
         std::cout << "product: " << fproduct << '\n';
     }
-    */
     return 0;
 }
