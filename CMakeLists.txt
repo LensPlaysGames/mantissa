@@ -25,7 +25,7 @@ include(CTest)
 if (BUILD_TESTING)
   file(GLOB PASSING_TESTS tst/pass_*.cpp)
   foreach(test ${PASSING_TESTS})
-    string(RANDOM testname)
+    string(MAKE_C_IDENTIFIER ${test} testname)
     add_executable(
       ${testname}
       ${test}
@@ -42,7 +42,7 @@ if (BUILD_TESTING)
   endforeach()
   file(GLOB FAILING_TESTS tst/fail_*.cpp)
   foreach(test ${FAILING_TESTS})
-    string(RANDOM testname)
+    string(MAKE_C_IDENTIFIER ${test} testname)
     add_executable(
       ${testname}
       ${test}
