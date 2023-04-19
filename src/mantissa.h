@@ -393,29 +393,29 @@ struct FloatImpl {
         static constexpr Repr shift_mask_hi = ((Repr(1) << shift_amount_hi) - 1) << shift_amount_lo;
         // Calculate product of lower half of mantissa.
         Repr low_mantissa = (left_mantissa & shift_mask_lo) * (right_mantissa & shift_mask_lo);
-        std::cout << "lo * lo:\n"
-                  << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
-                  << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
-                  << " =" << std::bitset<exponent_bit + 1>(low_mantissa) << '\n';
+        //std::cout << "lo * lo:\n"
+        //          << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
+        //          << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
+        //          << " =" << std::bitset<exponent_bit + 1>(low_mantissa) << '\n';
 
         Repr lowhigh_mantissa = (left_mantissa & shift_mask_lo) * (right_mantissa >> shift_amount_lo);
-        std::cout << "lo * hi:\n"
-                  << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
-                  << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
-                  << " =" << std::bitset<exponent_bit + 1>(lowhigh_mantissa) << '\n';
+        //std::cout << "lo * hi:\n"
+        //          << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
+        //          << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
+        //          << " =" << std::bitset<exponent_bit + 1>(lowhigh_mantissa) << '\n';
 
         Repr highlow_mantissa = (left_mantissa >> (shift_amount_lo - 1)) * (right_mantissa & shift_mask_lo);
-        std::cout << "hi * lo:\n"
-                  << "              " << std::bitset<shift_amount_hi>(left_mantissa >> shift_amount_lo) << '\n'
-                  << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
-                  << " =" << std::bitset<exponent_bit + 1>(highlow_mantissa) << '\n';
+        //std::cout << "hi * lo:\n"
+        //          << "              " << std::bitset<shift_amount_hi>(left_mantissa >> shift_amount_lo) << '\n'
+        //          << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
+        //          << " =" << std::bitset<exponent_bit + 1>(highlow_mantissa) << '\n';
 
         // Calculate product of higher half of mantissa.
         Repr high_mantissa = (left_mantissa >> (shift_amount_lo - 1)) * (right_mantissa >> shift_amount_lo);
-        std::cout << "hi * hi:\n"
-                  << "              " << std::bitset<shift_amount_hi>(left_mantissa >> (shift_amount_lo - 1)) << '\n'
-                  << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
-                  << " =" << std::bitset<exponent_bit + 1>(high_mantissa) << '\n';
+        //std::cout << "hi * hi:\n"
+        //          << "              " << std::bitset<shift_amount_hi>(left_mantissa >> (shift_amount_lo - 1)) << '\n'
+        //          << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
+        //          << " =" << std::bitset<exponent_bit + 1>(high_mantissa) << '\n';
 
         // All of the top mantissa bits are set from the low bits of the high mantissa;
         // the bottom bit is set according to the rounding mode.
@@ -424,7 +424,7 @@ struct FloatImpl {
         // half of what they could be, than the bit rounds down (nearest). If
         // it's exactly half-way, round down (0 is even and 1 is not, and in
         // binary that means we can ever only round down).
-        Repr new_mantissa = high_mantissa + (highlow_mantissa >> (shift_amount_lo - 1));
+        Repr new_mantissa = (high_mantissa + (highlow_mantissa >> (shift_amount_lo - 1))) & shift_mask_hi;
         if ((low_mantissa + (lowhigh_mantissa >> shift_amount_lo)) >> shift_amount_lo) new_mantissa |= 1;
         else new_mantissa &= ~Repr(1);
 
