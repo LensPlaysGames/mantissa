@@ -14,15 +14,21 @@ using s8 = int8_t;
 
 template<
     typename Repr,
-    Repr sign_mask,
-    Repr exponent_mask,
-    Repr mantissa_mask,
     Repr sign_bit,
     Repr exponent_bit,
     Repr exponent_bias>
 struct FloatImpl {
+    static constexpr size_t representation_bits = sizeof(Repr) * 8;
+    static_assert(sign_bit < representation_bits, "Sign bit must fit within underlying representation.");
+    static_assert(sign_bit > exponent_bit, "Sign bit must be a more significant bit than the exponent bit.");
+    static_assert(exponent_bit, "Exponent bit must leave room for at least 1 LSB dedicated to mantissa.");
+    static_assert(exponent_bit < representation_bits, "Exponent bit must fit within underlying representation.");
+
     using SignedRepr = std::make_signed_t<Repr>;
+    static constexpr Repr sign_mask = (Repr(1) << sign_bit);
+    static constexpr Repr exponent_mask = ((Repr(1) << (sign_bit - exponent_bit)) - 1) << exponent_bit;
     static constexpr Repr mantissa_bit = 0;
+    static constexpr Repr mantissa_mask = (Repr(1) << exponent_bit) - 1;
 
     Repr representation{};
 
@@ -119,7 +125,7 @@ struct FloatImpl {
             new_mantissa >>= 1;
         }
         // If the new mantissa is non-zero and...
-        if (new_mantissa) {
+        if (new_mantissa & mantissa_mask) {
             // If the implicit leading one *isn't* set, shift it to the
             // left until the leading one is set.
             while (!(new_mantissa & ~mantissa_mask)) {
@@ -144,14 +150,15 @@ struct FloatImpl {
     std::string mantissa_string(Repr base = 10) const {
         Repr mtsa = mantissa_no_leading();
         std::string out;
-        if (mtsa)
+        if (mtsa) {
             while (mtsa) {
                 mtsa *= base;
                 out += '0' + ((mtsa & ~mantissa_mask) >> exponent_bit);
                 mtsa &= mantissa_mask;
             }
-        else return "0";
-        return out;
+            return out;
+        }
+        return "0";
     }
 
     std::string ascii_scientific() const {
@@ -351,39 +358,86 @@ struct FloatImpl {
         // the bits. This is a software version of a very dumbed-down
         // Karatsuba-Urdhva multiplier, afaik.
 
+        // NOTE:
+        // 4.20f * 10.0f == 42.0f but it actually equals 41.9922 with the following code...
+        // 4.20f == 0b01000000100001100110011001100110
+        //            = not signed
+        //             ======== exponent of +2
+        //                     ======================= mantissa of 00_0011_ repeating
+        // 10.0f == 0b01000001001000000000000000000000
+        //            = not signed
+        //             ======== exponent of +3
+        //                     ======================= mantissa of 01
+        // 42.0f == 0b01000010001010000000000000000000
+        //            = not signed
+        //             ======== exponent of +5
+        //                     ======================= mantissa of 0101
+        // I am quite confusion.
+        // 4.20f mantissa is 0b1.00001100110011001100110
+        // 10.0f mantissa is 0b1.01000000000000000000000
+        // When you multiply these binary numbers (including the implicit
+        // leading one), you get 1.01001111111 (in binary still). How are we
+        // meant to convert that into 1.01010000000? If there are a certain
+        // amount of 1s in a row do we just turn them higher? I *must* be
+        // missing something...
+
+        // exponent_bit stores the first index after the mantissa, which can
+        // also be thought of as the amount of mantissa bits stored in the
+        // representation. The leading, hidden one + this number is equal to
+        // the bit precision of this float format.
+        static constexpr Repr bits_precision = (1 + exponent_bit);
         // Amount of mantissa bits over two (half)
-        static constexpr Repr shift_amount = (1 + exponent_bit) / 2 + ((1 + exponent_bit) % 2);
-        static constexpr Repr shift_mask = (Repr(1) << shift_amount) - 1;
+        static constexpr Repr shift_amount_lo = bits_precision / 2 + (bits_precision % 2);
+        static constexpr Repr shift_mask_lo = (Repr(1) << shift_amount_lo) - 1;
+        static constexpr Repr shift_amount_hi = bits_precision / 2;
+        static constexpr Repr shift_mask_hi = ((Repr(1) << shift_amount_hi) - 1) << shift_amount_lo;
         // Calculate product of lower half of mantissa.
-        //Repr low_mantissa = (left_mantissa & shift_mask) * (right_mantissa & shift_mask);
+        Repr low_mantissa = (left_mantissa & shift_mask_lo) * (right_mantissa & shift_mask_lo);
+        std::cout << "lo * lo:\n"
+                  << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
+                  << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(low_mantissa) << '\n';
+
+        Repr lowhigh_mantissa = (left_mantissa & shift_mask_lo) * (right_mantissa >> shift_amount_lo);
+        std::cout << "lo * hi:\n"
+                  << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
+                  << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(lowhigh_mantissa) << '\n';
+
+        Repr highlow_mantissa = (left_mantissa >> (shift_amount_lo - 1)) * (right_mantissa & shift_mask_lo);
+        std::cout << "hi * lo:\n"
+                  << "              " << std::bitset<shift_amount_hi>(left_mantissa >> shift_amount_lo) << '\n'
+                  << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(highlow_mantissa) << '\n';
+
         // Calculate product of higher half of mantissa.
-        Repr high_mantissa = (left_mantissa >> shift_amount) * (right_mantissa >> shift_amount);
+        Repr high_mantissa = (left_mantissa >> (shift_amount_lo - 1)) * (right_mantissa >> shift_amount_lo);
+        std::cout << "hi * hi:\n"
+                  << "              " << std::bitset<shift_amount_hi>(left_mantissa >> (shift_amount_lo - 1)) << '\n'
+                  << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(high_mantissa) << '\n';
+
         // All of the top mantissa bits are set from the low bits of the high mantissa;
-        // the bottom bit would be set by the MSB of the low mantissa,
-        // but we are doing ties-to-even rounding which means the
-        // bottom bit of the mantissa will never be set, afaik.
-        Repr new_mantissa = (high_mantissa << 1);
+        // the bottom bit is set according to the rounding mode.
+        // Currently we only support "round-to-nearest, ties-to-even".
+        // That's exactly what it sounds like. If the low bits are less than
+        // half of what they could be, than the bit rounds down (nearest). If
+        // it's exactly half-way, round down (0 is even and 1 is not, and in
+        // binary that means we can ever only round down).
+        Repr new_mantissa = high_mantissa + (highlow_mantissa >> (shift_amount_lo - 1));
+        if ((low_mantissa + (lowhigh_mantissa >> shift_amount_lo)) >> shift_amount_lo) new_mantissa |= 1;
+        else new_mantissa &= ~Repr(1);
+
         set_mantissa_normalised(new_mantissa);
     }
 
     constexpr FloatImpl operator*(FloatImpl rhs) const {
-        FloatImpl lhs = *this;
-        lhs.mul(rhs);
-        return lhs;
+        rhs.mul(*this);
+        return rhs;
     }
-
-    //constexpr FloatImpl operator/(FloatImpl rhs) const {
-    //    FloatImpl lhs = *this;
-    //    lhs.div(rhs);
-    //    return lhs;
-    //}
 };
 
-using binary32 = FloatImpl<u32,
-                           0b1000'0000'0000'0000'0000'0000'0000'0000,
-                           0b0111'1111'1000'0000'0000'0000'0000'0000,
-                           0b0000'0000'0111'1111'1111'1111'1111'1111,
-                           31, 23, 127>;
+using binary32 = FloatImpl<u32, 31, 23, 127>;
 
 /// Call this macro with the test condition you'd like to ensure from a
 /// test's `main`.
