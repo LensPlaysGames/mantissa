@@ -391,42 +391,55 @@ struct FloatImpl {
         static constexpr Repr shift_mask_lo = (Repr(1) << shift_amount_lo) - 1;
         static constexpr Repr shift_amount_hi = bits_precision / 2;
         static constexpr Repr shift_mask_hi = ((Repr(1) << shift_amount_hi) - 1) << shift_amount_lo;
-        // Calculate product of lower half of mantissa.
-        Repr low_mantissa = (left_mantissa & shift_mask_lo) * (right_mantissa & shift_mask_lo);
-        //std::cout << "lo * lo:\n"
-        //          << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
-        //          << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
-        //          << " =" << std::bitset<exponent_bit + 1>(low_mantissa) << '\n';
 
-        Repr lowhigh_mantissa = (left_mantissa & shift_mask_lo) * (right_mantissa >> shift_amount_lo);
-        //std::cout << "lo * hi:\n"
-        //          << "              " << std::bitset<shift_amount_lo>(left_mantissa) << '\n'
-        //          << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
-        //          << " =" << std::bitset<exponent_bit + 1>(lowhigh_mantissa) << '\n';
+        Repr left_lo = left_mantissa & shift_mask_lo;
+        Repr right_lo = right_mantissa & shift_mask_lo;
+        Repr left_hi = left_mantissa >> shift_amount_lo;
+        Repr right_hi = right_mantissa >> shift_amount_lo;
 
-        Repr highlow_mantissa = (left_mantissa >> (shift_amount_lo - 1)) * (right_mantissa & shift_mask_lo);
-        //std::cout << "hi * lo:\n"
-        //          << "              " << std::bitset<shift_amount_hi>(left_mantissa >> shift_amount_lo) << '\n'
-        //          << " *            " << std::bitset<shift_amount_lo>(right_mantissa) << '\n'
-        //          << " =" << std::bitset<exponent_bit + 1>(highlow_mantissa) << '\n';
+        Repr low_mantissa = left_lo * right_lo;
+        Repr lowhigh_mantissa = left_lo * right_hi;
+        Repr highlow_mantissa = left_hi * right_lo;
+        Repr high_mantissa = left_hi * right_hi;
 
-        // Calculate product of higher half of mantissa.
-        Repr high_mantissa = (left_mantissa >> (shift_amount_lo - 1)) * (right_mantissa >> shift_amount_lo);
-        //std::cout << "hi * hi:\n"
-        //          << "              " << std::bitset<shift_amount_hi>(left_mantissa >> (shift_amount_lo - 1)) << '\n'
-        //          << " *            " << std::bitset<shift_amount_hi>(right_mantissa >> shift_amount_lo) << '\n'
-        //          << " =" << std::bitset<exponent_bit + 1>(high_mantissa) << '\n';
 
-        // All of the top mantissa bits are set from the low bits of the high mantissa;
-        // the bottom bit is set according to the rounding mode.
-        // Currently we only support "round-to-nearest, ties-to-even".
-        // That's exactly what it sounds like. If the low bits are less than
-        // half of what they could be, than the bit rounds down (nearest). If
-        // it's exactly half-way, round down (0 is even and 1 is not, and in
-        // binary that means we can ever only round down).
-        Repr new_mantissa = (high_mantissa + (highlow_mantissa >> (shift_amount_lo - 1))) & shift_mask_hi;
-        if ((low_mantissa + (lowhigh_mantissa >> shift_amount_lo)) >> shift_amount_lo) new_mantissa |= 1;
-        else new_mantissa &= ~Repr(1);
+        /*
+        std::bitset<shift_amount_lo> left_lo_bits = {left_lo};
+        std::bitset<shift_amount_lo> right_lo_bits = {right_lo};
+        std::bitset<shift_amount_hi> left_hi_bits = {left_hi};
+        std::bitset<shift_amount_hi> right_hi_bits = {right_hi};
+        std::cout << "lo * lo:\n"
+                  << "              " << left_lo_bits << '\n'
+                  << " *            " << right_lo_bits << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(low_mantissa) << '\n';
+        std::cout << "lo * hi:\n"
+                  << "              " << left_lo_bits << '\n'
+                  << " *            " << right_hi_bits << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(lowhigh_mantissa) << '\n';
+        std::cout << "hi * lo:\n"
+                  << "              " << left_hi_bits << '\n'
+                  << " *            " << right_lo_bits << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(highlow_mantissa) << '\n';
+        std::cout << "hi * hi:\n"
+                  << "              " << left_hi_bits << '\n'
+                  << " *            " << right_hi_bits << '\n'
+                  << " =" << std::bitset<exponent_bit + 1>(high_mantissa) << '\n';
+        */
+
+        //   11
+        // * 18
+        // -----
+        //   88  (8*1)x10^0 + (8*1)x10^1
+        //  110  (1*1)*10^1 + (1*1)x10^2
+        //
+        Repr firstrow = low_mantissa + (lowhigh_mantissa << (shift_amount_lo + 1));
+        Repr secondrow = high_mantissa + (highlow_mantissa >> (shift_amount_lo));
+        Repr new_mantissa = (firstrow << shift_amount_lo) + (secondrow);
+        new_mantissa += 1;
+        new_mantissa &= ~1;
+        new_mantissa <<= 1;
+
+        //std::cout << "new mantissa: \n" << std::bitset<sizeof(Repr) * 8>(new_mantissa) << '\n';
 
         set_mantissa_normalised(new_mantissa);
     }
